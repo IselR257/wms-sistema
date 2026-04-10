@@ -1,0 +1,39 @@
+# Pipeline de Integración y Despliegue Continuo (CI/CD)
+# Ejecuta pruebas y validaciones en cada push a main o develop
+
+name: Pipeline CI/CD
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  build-y-pruebas:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Obtener código del repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js v20 LTS
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Instalar dependencias del backend
+        working-directory: ./backend
+        run: npm install --ignore-scripts
+
+      - name: Instalar dependencias del frontend
+        working-directory: ./frontend
+        run: npm install --ignore-scripts
+
+      - name: Ejecutar pruebas del backend
+        working-directory: ./backend
+        run: npm test
+
+      - name: Compilar frontend
+        working-directory: ./frontend
+        run: npm run build
