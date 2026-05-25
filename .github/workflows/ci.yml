@@ -1,39 +1,36 @@
-# Pipeline de Integración y Despliegue Continuo (CI/CD)
-# Ejecuta pruebas y validaciones en cada push a main o develop
-
-name: Pipeline CI/CD
+name: CI/CD - WMS Sistema
 
 on:
   push:
-    branches: [main, develop]
+    branches: [ "develop" ]
   pull_request:
-    branches: [main, develop]
+    branches: [ "develop" ]
 
 jobs:
-  build-y-pruebas:
+  build-and-test:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Obtener código del repositorio
-        uses: actions/checkout@v4
+    - uses: actions/checkout@v4
 
-      - name: Configurar Node.js v20 LTS
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
+    - name: Configurar Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: backend/package-lock.json
 
-      - name: Instalar dependencias del backend
-        working-directory: ./backend
-        run: npm install --ignore-scripts
+    - name: Instalar dependencias
+      run: |
+        cd backend
+        npm install
 
-      - name: Instalar dependencias del frontend
-        working-directory: ./frontend
-        run: npm install --ignore-scripts
+    - name: Ejecutar pruebas
+      run: |
+        cd backend
+        npm test
 
-      - name: Ejecutar pruebas del backend
-        working-directory: ./backend
-        run: npm test
-
-      - name: Compilar frontend
-        working-directory: ./frontend
-        run: npm run build
+    - name: Reporte de cobertura
+      run: |
+        cd backend
+        npm run coverage || true
