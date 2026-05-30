@@ -30,7 +30,7 @@ describe('Pruebas de integración - API WMS', () => {
   });
 
   test('email con formato correcto es aceptado por el sistema', () => {
-    const validarEmail = (email) => {
+	const validarEmail = (email: string): boolean => {
       return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
     };
     expect(validarEmail('bodega@wms.com')).toBe(true);
