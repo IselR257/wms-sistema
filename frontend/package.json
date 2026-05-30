@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "desarrollo": "vite",
-    "build": "echo 'Compilación pendiente - Sprint 1' && exit 0",
+    "build": "vite build",
     "lint": "echo 'Lint pendiente'",
     "preview": "vite preview",
     "dev": "vite"

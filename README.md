@@ -14,27 +14,48 @@ Un WMS (Warehouse Management System) que permite controlar recepción, almacenam
 - **ORM:** Prisma
 - **Auth:** JWT + bcrypt
 - **CI/CD:** GitHub Actions
-- **Hosting:** Vercel (FE) + Railway (BE)
+- **Hosting:** Railway
 
 ## Estructura
 
 ```
 wms-sistema/
-├── frontend/           # React SPA
-│   └── src/
-│       ├── components/
-│       ├── pages/
-│       ├── services/
-│       └── context/
-├── backend/            # REST API
-│   ├── src/
-│   │   ├── routes/
-│   │   ├── controllers/
-│   │   ├── middlewares/
-│   │   └── services/
-│   ├── prisma/
-│   └── tests/
-└── .github/workflows/  # CI/CD pipeline
+├── frontend/           # SPA con Vite
+├── backend/            # API REST con Express + Prisma
+├── railway.toml        # Configuración de build/start para Railway
+└── package.json        # Scripts raíz
+```
+
+## Despliegue en Railway
+
+El repositorio quedó preparado para desplegarse como un solo servicio:
+
+- Railway ejecuta `npm run build` en la raíz.
+- El frontend se compila con Vite en `frontend/dist`.
+- El backend compila TypeScript a `backend/dist`.
+- `npm start` levanta Express y sirve tanto la API como la SPA desde el mismo dominio.
+
+### Variables de entorno requeridas
+
+```bash
+PORT=3000
+JWT_SECRET=coloca_un_secreto_largo_y_seguro
+DATABASE_URL=postgresql://usuario:password@host:5432/wms_db
+```
+
+### Variables opcionales
+
+```bash
+VITE_API_BASE_URL=
+```
+
+Si `VITE_API_BASE_URL` está vacía, el frontend usa el mismo dominio de Railway y consume `/api` directamente.
+
+### Endpoints de verificación
+
+```bash
+/health
+/api/health
 ```
 
 ## Metodología

@@ -18,19 +18,16 @@ jobs:
       with:
         node-version: '20'
         cache: 'npm'
-        cache-dependency-path: backend/package-lock.json
+        cache-dependency-path: package-lock.json
 
     - name: Instalar dependencias
-      run: |
-        cd backend
-        npm install
+      run: npm ci
 
     - name: Ejecutar pruebas
-      run: |
-        cd backend
-        npm test
+      run: npm --workspace backend test
 
     - name: Reporte de cobertura
-      run: |
-        cd backend
-        npm run coverage || true
+      run: npm --workspace backend run coverage || true
+
+    - name: Compilar proyecto
+      run: npm run build

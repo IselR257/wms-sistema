@@ -1,6 +1,9 @@
 import "./styles.css";
 
-const API_BASE = "http://localhost:3000/api";
+const API_BASE = (
+  import.meta.env.VITE_API_BASE_URL ||
+  `${window.location.origin}/api`
+).replace(/\/$/, "");
 
 const PERMISSION_OPTIONS = [
   "Usuarios",
