@@ -293,46 +293,7 @@ async function initializeApp() {
   render();
 
   try {
-    const tasks = [loadDashboard()];
-
-    if (canAccessScreen("inventario") || canAccessScreen("despacho")) {
-      tasks.push(loadInventory(), loadMovements());
-    }
-    if (canAccessScreen("recepcion") || canAccessScreen("compras")) {
-      tasks.push(loadPurchaseOrders());
-    }
-    if (canAccessScreen("despacho")) {
-      tasks.push(loadDispatchOrders());
-    }
-    if (canAccessScreen("recepcion") || canAccessScreen("despacho") || canAccessScreen("ubicaciones")) {
-      tasks.push(loadLocations());
-    }
-    if (canAccessScreen("inventario") || canAccessScreen("compras") || canAccessScreen("despacho") || canAccessScreen("administracion")) {
-      tasks.push(loadProducts());
-    }
-    if (canAccessScreen("inventario") || canAccessScreen("administracion")) {
-      tasks.push(loadCategories());
-    }
-    if (canAccessScreen("compras")) {
-      tasks.push(loadProviders());
-    }
-    if (canAccessScreen("despacho") || canAccessScreen("administracion")) {
-      tasks.push(loadClients());
-    }
-    if (canAccessScreen("usuarios") || canAccessScreen("roles")) {
-      tasks.push(loadUsers());
-    }
-    if (canAccessScreen("roles")) {
-      tasks.push(loadRoleDefinitions());
-    }
-    if (canAccessScreen("auditoria")) {
-      tasks.push(loadAudit());
-    }
-    if (canAccessScreen("reportes")) {
-      tasks.push(loadReports());
-    }
-
-    await Promise.all(tasks);
+    await loadInitialData();
   } catch (error) {
     if (error.message === "__AUTH__") return;
     setFlash("error", error.message);
@@ -346,46 +307,7 @@ async function refreshData() {
   state.loading = true;
   render();
   try {
-    const tasks = [loadDashboard()];
-
-    if (canAccessScreen("inventario") || canAccessScreen("despacho")) {
-      tasks.push(loadInventory(), loadMovements());
-    }
-    if (canAccessScreen("recepcion") || canAccessScreen("compras")) {
-      tasks.push(loadPurchaseOrders());
-    }
-    if (canAccessScreen("despacho")) {
-      tasks.push(loadDispatchOrders());
-    }
-    if (canAccessScreen("recepcion") || canAccessScreen("despacho") || canAccessScreen("ubicaciones")) {
-      tasks.push(loadLocations());
-    }
-    if (canAccessScreen("inventario") || canAccessScreen("compras") || canAccessScreen("despacho") || canAccessScreen("administracion")) {
-      tasks.push(loadProducts());
-    }
-    if (canAccessScreen("inventario") || canAccessScreen("administracion")) {
-      tasks.push(loadCategories());
-    }
-    if (canAccessScreen("compras")) {
-      tasks.push(loadProviders());
-    }
-    if (canAccessScreen("despacho") || canAccessScreen("administracion")) {
-      tasks.push(loadClients());
-    }
-    if (canAccessScreen("usuarios") || canAccessScreen("roles")) {
-      tasks.push(loadUsers());
-    }
-    if (canAccessScreen("roles")) {
-      tasks.push(loadRoleDefinitions());
-    }
-    if (canAccessScreen("auditoria")) {
-      tasks.push(loadAudit());
-    }
-    if (canAccessScreen("reportes")) {
-      tasks.push(loadReports());
-    }
-
-    await Promise.all(tasks);
+    await loadInitialData();
   } catch (error) {
     if (error.message === "__AUTH__") return;
     state.flash = { type: "error", text: error.message };
@@ -393,6 +315,88 @@ async function refreshData() {
     state.loading = false;
     render();
   }
+}
+
+function buildLoadTasks() {
+  const tasks = [{ label: "dashboard", run: loadDashboard }];
+
+  if (canAccessScreen("inventario") || canAccessScreen("despacho")) {
+    tasks.push(
+      { label: "inventario", run: loadInventory },
+      { label: "movimientos", run: loadMovements }
+    );
+  }
+  if (canAccessScreen("recepcion") || canAccessScreen("compras")) {
+    tasks.push({ label: "compras", run: loadPurchaseOrders });
+  }
+  if (canAccessScreen("despacho")) {
+    tasks.push({ label: "despachos", run: loadDispatchOrders });
+  }
+  if (canAccessScreen("recepcion") || canAccessScreen("despacho") || canAccessScreen("ubicaciones")) {
+    tasks.push({ label: "ubicaciones", run: loadLocations });
+  }
+  if (canAccessScreen("inventario") || canAccessScreen("compras") || canAccessScreen("despacho") || canAccessScreen("administracion")) {
+    tasks.push({ label: "productos", run: loadProducts });
+  }
+  if (canAccessScreen("inventario") || canAccessScreen("administracion")) {
+    tasks.push({ label: "categorías", run: loadCategories });
+  }
+  if (canAccessScreen("compras")) {
+    tasks.push({ label: "proveedores", run: loadProviders });
+  }
+  if (canAccessScreen("despacho") || canAccessScreen("administracion")) {
+    tasks.push({ label: "clientes", run: loadClients });
+  }
+  if (canAccessScreen("usuarios") || canAccessScreen("roles")) {
+    tasks.push({ label: "usuarios", run: loadUsers });
+  }
+  if (canAccessScreen("roles")) {
+    tasks.push({ label: "roles", run: loadRoleDefinitions });
+  }
+  if (canAccessScreen("auditoria")) {
+    tasks.push({ label: "auditoría", run: loadAudit });
+  }
+  if (canAccessScreen("reportes")) {
+    tasks.push({ label: "reportes", run: loadReports });
+  }
+
+  return tasks;
+}
+
+async function loadInitialData() {
+  const tasks = buildLoadTasks();
+  const results = await Promise.allSettled(
+    tasks.map(async (task) => {
+      await task.run();
+      return task.label;
+    })
+  );
+
+  const failures = results
+    .map((result, index) => ({ result, task: tasks[index] }))
+    .filter(({ result }) => result.status === "rejected");
+
+  if (!failures.length) {
+    state.flash = null;
+    return;
+  }
+
+  const authFailure = failures.find(
+    ({ result }) => result.status === "rejected" && result.reason?.message === "__AUTH__"
+  );
+  if (authFailure) {
+    throw authFailure.result.reason;
+  }
+
+  const labels = failures.map(({ task }) => task.label);
+  const details = failures
+    .map(({ task, result }) => `${task.label}: ${result.reason?.message || "error desconocido"}`)
+    .join(" | ");
+
+  state.flash = {
+    type: "error",
+    text: `Falló la carga de ${labels.join(", ")}. ${details}`
+  };
 }
 
 async function loadDashboard() {
