@@ -20,6 +20,7 @@ export const PERMISSION_OPTIONS = [
 export type Permission = (typeof PERMISSION_OPTIONS)[number];
 
 const VALID_PERMISSIONS = new Set<string>(PERMISSION_OPTIONS);
+let ensureRoleConfigurationsPromise: Promise<void> | null = null;
 
 export const DEFAULT_ROLE_DEFINITIONS: Record<RolUsuario, { descripcion: string; permisosList: Permission[] }> = {
   ADMIN: {
@@ -39,20 +40,28 @@ export const DEFAULT_ROLE_DEFINITIONS: Record<RolUsuario, { descripcion: string;
 export const normalizePermissions = (permissions: string[]) =>
   [...new Set(permissions.filter((permission) => VALID_PERMISSIONS.has(permission)))] as Permission[];
 
+const syncRoleConfigurations = async () => {
+  for (const [rol, config] of Object.entries(DEFAULT_ROLE_DEFINITIONS)) {
+    await prisma.configuracionRol.upsert({
+      where: { rol: rol as RolUsuario },
+      update: {},
+      create: {
+        rol: rol as RolUsuario,
+        descripcion: config.descripcion,
+        permisos: config.permisosList
+      }
+    });
+  }
+};
+
 export const ensureRoleConfigurations = async () => {
-  await Promise.all(
-    Object.entries(DEFAULT_ROLE_DEFINITIONS).map(([rol, config]) =>
-      prisma.configuracionRol.upsert({
-        where: { rol: rol as RolUsuario },
-        update: {},
-        create: {
-          rol: rol as RolUsuario,
-          descripcion: config.descripcion,
-          permisos: config.permisosList
-        }
-      })
-    )
-  );
+  if (!ensureRoleConfigurationsPromise) {
+    ensureRoleConfigurationsPromise = syncRoleConfigurations().finally(() => {
+      ensureRoleConfigurationsPromise = null;
+    });
+  }
+
+  await ensureRoleConfigurationsPromise;
 };
 
 export const listRoleConfigurations = async () => {
