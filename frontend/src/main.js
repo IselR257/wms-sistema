@@ -365,12 +365,22 @@ function buildLoadTasks() {
 
 async function loadInitialData() {
   const tasks = buildLoadTasks();
-  const results = await Promise.allSettled(
-    tasks.map(async (task) => {
+  const results = [];
+
+  for (const task of tasks) {
+    try {
       await task.run();
-      return task.label;
-    })
-  );
+      results.push({
+        status: "fulfilled",
+        value: task.label
+      });
+    } catch (error) {
+      results.push({
+        status: "rejected",
+        reason: error
+      });
+    }
+  }
 
   const failures = results
     .map((result, index) => ({ result, task: tasks[index] }))
