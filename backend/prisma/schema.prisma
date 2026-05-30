@@ -1,0 +1,310 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum RolUsuario {
+  ADMIN
+  SUPERVISOR
+  BODEGUERO
+}
+
+enum TipoMovimiento {
+  ENTRADA
+  SALIDA
+  AJUSTE
+  TRANSFERENCIA
+}
+
+enum EstadoOrdenCompra {
+  PENDIENTE
+  PARCIAL
+  COMPLETA
+}
+
+enum EstadoOrdenDespacho {
+  PENDIENTE
+  EN_PICKING
+  DESPACHADA
+}
+
+model Usuario {
+  id                String              @id @default(uuid()) @db.Uuid
+  nombre            String
+  email             String              @unique
+  passwordHash      String              @map("password_hash")
+  rol               RolUsuario
+  activo            Boolean             @default(true)
+  createdAt         DateTime            @default(now()) @map("created_at")
+  movimientos       MovimientoInventario[]
+  ordenesCompra     OrdenCompra[]
+  ordenesDespacho   OrdenDespacho[]
+  devolucionesDespacho DevolucionDespacho[]
+  recepciones       Recepcion[]
+  auditorias        Auditoria[]
+
+  @@map("usuarios")
+}
+
+model ConfiguracionRol {
+  id          String     @id @default(uuid()) @db.Uuid
+  rol         RolUsuario @unique
+  descripcion String
+  permisos    String[]
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
+
+  @@map("configuraciones_rol")
+}
+
+model Categoria {
+  id          String     @id @default(uuid()) @db.Uuid
+  nombre      String     @unique
+  descripcion String?
+  productos   Producto[]
+
+  @@map("categorias")
+}
+
+model Producto {
+  id                String                @id @default(uuid()) @db.Uuid
+  codigoBarras      String                @unique @map("codigo_barras")
+  nombre            String
+  descripcion       String?
+  categoriaId       String?               @map("categoria_id") @db.Uuid
+  unidadMedida      String                @map("unidad_medida")
+  stockMinimo       Int                   @default(0) @map("stock_minimo")
+  stockMaximo       Int                   @default(0) @map("stock_maximo")
+  categoria         Categoria?            @relation(fields: [categoriaId], references: [id])
+  inventarios       Inventario[]
+  movimientos       MovimientoInventario[]
+  detallesCompra    DetalleOrdenCompra[]
+  detallesRecepcion DetalleRecepcion[]
+  detallesDespacho  DetalleDespacho[]
+
+  @@map("productos")
+}
+
+model Bodega {
+  id         String    @id @default(uuid()) @db.Uuid
+  nombre     String
+  direccion  String?
+  activa     Boolean   @default(true)
+  secciones  Seccion[]
+
+  @@map("bodegas")
+}
+
+model Seccion {
+  id        String   @id @default(uuid()) @db.Uuid
+  nombre    String
+  bodegaId  String   @map("bodega_id") @db.Uuid
+  bodega    Bodega   @relation(fields: [bodegaId], references: [id])
+  racks     Rack[]
+
+  @@map("secciones")
+}
+
+model Rack {
+  id         String      @id @default(uuid()) @db.Uuid
+  codigo     String      @unique
+  seccionId  String      @map("seccion_id") @db.Uuid
+  capacidad  Int
+  seccion    Seccion     @relation(fields: [seccionId], references: [id])
+  ubicaciones Ubicacion[]
+
+  @@map("racks")
+}
+
+model Ubicacion {
+  id            String             @id @default(uuid()) @db.Uuid
+  codigo        String             @unique
+  rackId        String             @map("rack_id") @db.Uuid
+  nivel         Int
+  capacidadMax  Decimal            @map("capacidad_max") @db.Decimal(10, 2)
+  ocupada       Boolean            @default(false)
+  rack          Rack               @relation(fields: [rackId], references: [id])
+  inventarios   Inventario[]
+  recepciones   DetalleRecepcion[]
+  despachos     DetalleDespacho[]
+
+  @@map("ubicaciones")
+}
+
+model Inventario {
+  id           String    @id @default(uuid()) @db.Uuid
+  productoId   String    @map("producto_id") @db.Uuid
+  ubicacionId  String    @map("ubicacion_id") @db.Uuid
+  cantidad     Decimal   @db.Decimal(10, 2)
+  fechaAct     DateTime  @default(now()) @map("fecha_act")
+  producto     Producto  @relation(fields: [productoId], references: [id])
+  ubicacion    Ubicacion @relation(fields: [ubicacionId], references: [id])
+
+  @@unique([productoId, ubicacionId])
+  @@map("inventarios")
+}
+
+model MovimientoInventario {
+  id          String         @id @default(uuid()) @db.Uuid
+  tipo        TipoMovimiento
+  productoId  String         @map("producto_id") @db.Uuid
+  cantidad    Decimal        @db.Decimal(10, 2)
+  usuarioId   String         @map("usuario_id") @db.Uuid
+  referencia  String?
+  fecha       DateTime       @default(now())
+  producto    Producto       @relation(fields: [productoId], references: [id])
+  usuario     Usuario        @relation(fields: [usuarioId], references: [id])
+
+  @@map("movimientos_inventario")
+}
+
+model Proveedor {
+  id            String        @id @default(uuid()) @db.Uuid
+  nombre        String
+  contacto      String?
+  telefono      String?
+  email         String?
+  activo        Boolean       @default(true)
+  ordenesCompra OrdenCompra[]
+
+  @@map("proveedores")
+}
+
+model Cliente {
+  id              String          @id @default(uuid()) @db.Uuid
+  codigo          Int             @unique @default(autoincrement())
+  nombre          String
+  email           String?
+  telefono        String?
+  direccion       String?
+  activo          Boolean         @default(true)
+  ordenesDespacho OrdenDespacho[] @relation("ClienteOrdenes")
+
+  @@map("clientes")
+}
+
+model OrdenCompra {
+  id            String               @id @default(uuid()) @db.Uuid
+  numero        String               @unique
+  proveedorId   String               @map("proveedor_id") @db.Uuid
+  estado        EstadoOrdenCompra
+  fechaEmision  DateTime             @map("fecha_emision") @db.Date
+  usuarioId     String               @map("usuario_id") @db.Uuid
+  proveedor     Proveedor            @relation(fields: [proveedorId], references: [id])
+  usuario       Usuario              @relation(fields: [usuarioId], references: [id])
+  detalles      DetalleOrdenCompra[]
+  recepciones   Recepcion[]
+
+  @@map("ordenes_compra")
+}
+
+model DetalleOrdenCompra {
+  id              String      @id @default(uuid()) @db.Uuid
+  ordenCompraId   String      @map("orden_compra_id") @db.Uuid
+  productoId      String      @map("producto_id") @db.Uuid
+  cantidad        Decimal     @db.Decimal(10, 2)
+  precioUnitario  Decimal?    @map("precio_unitario") @db.Decimal(10, 2)
+  ordenCompra     OrdenCompra @relation(fields: [ordenCompraId], references: [id])
+  producto        Producto    @relation(fields: [productoId], references: [id])
+
+  @@map("detalles_orden_compra")
+}
+
+model Recepcion {
+  id             String             @id @default(uuid()) @db.Uuid
+  ordenCompraId  String             @map("orden_compra_id") @db.Uuid
+  fecha          DateTime           @default(now())
+  usuarioId      String             @map("usuario_id") @db.Uuid
+  observaciones  String?
+  ordenCompra    OrdenCompra        @relation(fields: [ordenCompraId], references: [id])
+  usuario        Usuario            @relation(fields: [usuarioId], references: [id])
+  detalles       DetalleRecepcion[]
+
+  @@map("recepciones")
+}
+
+model DetalleRecepcion {
+  id                String     @id @default(uuid()) @db.Uuid
+  recepcionId       String     @map("recepcion_id") @db.Uuid
+  productoId        String     @map("producto_id") @db.Uuid
+  cantidadEsperada  Decimal    @map("cantidad_esperada") @db.Decimal(10, 2)
+  cantidadRecibida  Decimal    @map("cantidad_recibida") @db.Decimal(10, 2)
+  ubicacionId       String     @map("ubicacion_id") @db.Uuid
+  recepcion         Recepcion  @relation(fields: [recepcionId], references: [id])
+  producto          Producto   @relation(fields: [productoId], references: [id])
+  ubicacion         Ubicacion  @relation(fields: [ubicacionId], references: [id])
+
+  @@map("detalles_recepcion")
+}
+
+model OrdenDespacho {
+  id             String               @id @default(uuid()) @db.Uuid
+  numero         String               @unique
+  cliente        String
+  clienteId      String?              @map("cliente_id") @db.Uuid
+  estado         EstadoOrdenDespacho
+  fechaRequerida DateTime             @map("fecha_requerida") @db.Date
+  usuarioId      String               @map("usuario_id") @db.Uuid
+  createdAt      DateTime             @default(now()) @map("created_at")
+  clienteData    Cliente?             @relation("ClienteOrdenes", fields: [clienteId], references: [id])
+  usuario        Usuario              @relation(fields: [usuarioId], references: [id])
+  detalles       DetalleDespacho[]
+  devoluciones   DevolucionDespacho[]
+
+  @@map("ordenes_despacho")
+}
+
+model DetalleDespacho {
+  id               String          @id @default(uuid()) @db.Uuid
+  ordenDespachoId  String          @map("orden_despacho_id") @db.Uuid
+  productoId       String          @map("producto_id") @db.Uuid
+  cantidad         Decimal         @db.Decimal(10, 2)
+  ubicacionId      String          @map("ubicacion_id") @db.Uuid
+  recogido         Boolean         @default(false)
+  ordenDespacho    OrdenDespacho   @relation(fields: [ordenDespachoId], references: [id])
+  producto         Producto        @relation(fields: [productoId], references: [id])
+  ubicacion        Ubicacion       @relation(fields: [ubicacionId], references: [id])
+  devoluciones     DetalleDevolucionDespacho[]
+
+  @@map("detalles_despacho")
+}
+
+model DevolucionDespacho {
+  id              String                     @id @default(uuid()) @db.Uuid
+  ordenDespachoId String                     @map("orden_despacho_id") @db.Uuid
+  usuarioId       String                     @map("usuario_id") @db.Uuid
+  motivo          String
+  createdAt       DateTime                   @default(now()) @map("created_at")
+  ordenDespacho   OrdenDespacho              @relation(fields: [ordenDespachoId], references: [id])
+  usuario         Usuario                    @relation(fields: [usuarioId], references: [id])
+  detalles        DetalleDevolucionDespacho[]
+
+  @@map("devoluciones_despacho")
+}
+
+model DetalleDevolucionDespacho {
+  id                  String             @id @default(uuid()) @db.Uuid
+  devolucionId        String             @map("devolucion_id") @db.Uuid
+  detalleDespachoId   String             @map("detalle_despacho_id") @db.Uuid
+  cantidad            Decimal            @db.Decimal(10, 2)
+  devolucion          DevolucionDespacho @relation(fields: [devolucionId], references: [id])
+  detalleDespacho     DetalleDespacho    @relation(fields: [detalleDespachoId], references: [id])
+
+  @@map("detalles_devolucion_despacho")
+}
+
+model Auditoria {
+  id         String    @id @default(uuid()) @db.Uuid
+  usuarioId  String    @map("usuario_id") @db.Uuid
+  accion     String
+  ipOrigen   String?   @map("ip_origen")
+  metadata   Json?
+  fecha      DateTime  @default(now())
+  usuario    Usuario   @relation(fields: [usuarioId], references: [id])
+
+  @@map("auditorias")
+}
